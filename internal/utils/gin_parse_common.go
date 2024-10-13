@@ -61,6 +61,9 @@ func GinGetPagerFromQuery(c *gin.Context) (pager *Pager) {
 	if err != nil {
 		limit = 10
 	}
+	if limit <= 0 {
+		limit = 10
+	}
 
 	page, err := strconv.Atoi(pageStr)
 	if err != nil {
@@ -68,7 +71,13 @@ func GinGetPagerFromQuery(c *gin.Context) (pager *Pager) {
 		if err != nil {
 			offset = 0
 		}
+		if offset < 0 {
+			offset = 0
+		}
 		return new(Pager).SetOffsetAndLimit(offset, limit)
+	}
+	if page <= 0 {
+		page = 1
 	}
 
 	return new(Pager).SetPageAndLimit(page, limit)
