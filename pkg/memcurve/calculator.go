@@ -96,20 +96,21 @@ func (calc *ReviewCalculator) CalculateReviewLevel(data *ReviewData, newConfiden
 	// 如果置信度低，可能意味着用户需要重新开始复习过程，返回到较低的复习级别
 	// 如果置信度高，用户可能已经巩固了知识，可以提升复习级别
 
+	currentLevel := calc.clampReviewLevel(data.ReviewLevel)
 	if newConfidence <= ConfidenceNone { // 低置信度重置复习级别到 0
 		return 0
 	} else if newConfidence <= ConfidenceLow { // 低置信度降低复习级别
-		return max(1, data.ReviewLevel/2)
+		return max(1, currentLevel/2)
 	} else if newConfidence <= ConfidenceMedium {
 		// 中置信度少量推进复习级别，但不会推进到最后2级
 		// todo: provide config
-		return min(len(calc.reviewIntervals)-3, data.ReviewLevel+1)
+		return min(len(calc.reviewIntervals)-3, currentLevel+1)
 	} else if newConfidence <= ConfidenceHigh {
 		// 高置信度，按部就班的增加复习级别，但不应超过当前记录的复习次数
-		return min(len(calc.reviewIntervals)-1, data.ReviewLevel+1)
+		return min(len(calc.reviewIntervals)-1, currentLevel+1)
 	} else {
 		// 牢记级别，直接 x 2，但不应超过当前记录的复习次数
-		return min(len(calc.reviewIntervals)-1, max(data.ReviewLevel, 1)*2)
+		return min(len(calc.reviewIntervals)-1, max(currentLevel, 1)*2)
 	}
 }
 
@@ -120,7 +121,11 @@ func (calc *ReviewCalculator) MaxReviewLevel() int {
 
 // ReviewIntervalOf 获取复习间隔，防止索引超出范围
 func (calc *ReviewCalculator) ReviewIntervalOf(level int) time.Duration {
-	return calc.reviewIntervals[min(level, calc.MaxReviewLevel())]
+	return calc.reviewIntervals[calc.clampReviewLevel(level)]
+}
+
+func (calc *ReviewCalculator) clampReviewLevel(level int) int {
+	return clamp(level, 0, calc.MaxReviewLevel())
 }
 
 // adjustoFrgettingSpeedWithConfidence 根据复习间隔和置信度来推测遗忘速度，以调整复习时间表

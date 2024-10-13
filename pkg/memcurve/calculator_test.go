@@ -194,6 +194,23 @@ func TestCalculateNextReviewWithSingleLowConfidenceReviewUsesBaseInterval(t *tes
 	assert.Equal(t, 1.0, calculator.userFactors.ForgettingSpeed, "CalculateNextReview(%+v, %v) forgetting speed", data, ConfidenceLow)
 }
 
+func TestCalculateNextReviewWithNegativeReviewLevelAdvancesFromLevelZero(t *testing.T) {
+	calculator := NewReviewCalculator(nil, UserFactors{ForgettingSpeed: 1})
+	lastReview := time.Now()
+	data := ReviewData{
+		ReviewRecords: []time.Time{lastReview},
+		ReviewLevel:   -2,
+	}
+
+	nextReviewTime, nextReviewLevel := calculator.CalculateNextReview(&data, ConfidenceHigh)
+
+	expectedNextReviewTime := lastReview.Add(DefaultIntervals[1])
+	if !nextReviewTime.Equal(expectedNextReviewTime) {
+		t.Errorf("CalculateNextReview(%+v, %v) time = %v, want %v", data, ConfidenceHigh, nextReviewTime, expectedNextReviewTime)
+	}
+	assert.Equal(t, 1, nextReviewLevel, "CalculateNextReview(%+v, %v) review level", data, ConfidenceHigh)
+}
+
 func TestCalcIntervalByForgettingSpeed(t *testing.T) {
 	testCases := []struct {
 		name            string
