@@ -32,7 +32,8 @@ func (p Percentage) Clamp0100() Percentage {
 }
 
 func (p *Percentage) FromNormalizedFloat(v float64) {
-	*p = Percentage(v * 100).Clamp0100()
+	v = Clamp(v, 0.0, 1.0)
+	*p = Percentage(v * 100)
 }
 
 func (p *Percentage) Times(v float64) float64 {
