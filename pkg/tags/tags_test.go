@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -28,15 +29,22 @@ const (
 
 // MockMQ 是 Producer 和 Consumer 接口的模拟实现
 type MockMQ struct {
+	mu  sync.Mutex
 	lst []string
 }
 
+var redisServer *miniredis.Miniredis
+
 func (m *MockMQ) Put(ctx context.Context, payload string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.lst = append(m.lst, payload)
 	return nil
 }
 
 func (m *MockMQ) Get(ctx context.Context) (*redismq.Package, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	if len(m.lst) == 0 {
 		return nil, nil
 	}
@@ -46,6 +54,8 @@ func (m *MockMQ) Get(ctx context.Context) (*redismq.Package, error) {
 }
 
 func (m *MockMQ) MGet(ctx context.Context, count int) ([]*redismq.Package, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	if len(m.lst) == 0 {
 		return []*redismq.Package{}, nil
 	}
@@ -60,18 +70,32 @@ func (m *MockMQ) MGet(ctx context.Context, count int) ([]*redismq.Package, error
 	}), nil
 }
 
+func (m *MockMQ) GetUnacked(ctx context.Context) (*redismq.Package, error) {
+	return nil, nil
+}
+
 func (m *MockMQ) Ack(ctx context.Context, pkg *redismq.Package) error {
 	return nil
 }
 
 func (m *MockMQ) Fail(ctx context.Context, pkg *redismq.Package) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.lst = append(m.lst, pkg.Payload)
 	return nil
 }
 
 func (m *MockMQ) Requeue(ctx context.Context, pkg *redismq.Package) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.lst = append(m.lst, pkg.Payload)
 	return nil
+}
+
+func (m *MockMQ) Len() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return len(m.lst)
 }
 
 // MockTagRepository 是 TagRepository 接口的模拟实现
@@ -123,7 +147,8 @@ func (m *MockTagRepository) GetEntitiesByTag(ctx context.Context, userID utils.U
 }
 
 func TestMain(m *testing.M) {
-	redisServer, err := miniredis.Run()
+	var err error
+	redisServer, err = miniredis.Run()
 	if err != nil {
 		panic(fmt.Sprintf("Failed to start miniredis: %v", err))
 	}
@@ -138,6 +163,18 @@ func TestMain(m *testing.M) {
 
 	// 退出测试
 	os.Exit(code)
+}
+
+func newTestTagService(t *testing.T, repo *MockTagRepository, mq *MockMQ) (context.Context, *tags.TagService[EntityType]) {
+	t.Helper()
+	redisServer.FlushAll()
+
+	ctx := context.TODO()
+	service := tags.NewTagService(ctx, repo, []EntityType{EntityTypeBlock, EntityTypePost}, mq, mq)
+	t.Cleanup(func() {
+		service.UpdateMgr.Stop(ctx)
+	})
+	return ctx, service
 }
 
 // 测试 TagUpdateManager 的启动和停止
@@ -173,7 +210,7 @@ func TestTagUpdateManager_Put(t *testing.T) {
 	message := tags.TagUpdateMessage[EntityType]{Action: tags.EventInvalidUser, UserID: 12345}
 	err := manager.Put(ctx, message)
 	assert.NoError(t, err)
-	assert.NotEmpty(t, mq.lst)
+	assert.Positive(t, mq.Len())
 }
 
 // 测试 TagUpdateManager 的 HandlePackage 方法
@@ -197,9 +234,7 @@ func TestTagUpdateManager_HandlePackage(t *testing.T) {
 func TestTagService_GetTagsByUser(t *testing.T) {
 	repo := NewMockTagRepository()
 	mq := new(MockMQ)
-	service := tags.NewTagService(repo, []EntityType{EntityTypeBlock, EntityTypePost}, mq, mq)
-
-	ctx := context.TODO()
+	ctx, service := newTestTagService(t, repo, mq)
 
 	// 验证缓存不存在
 	cacheKey := service.Schemas.User2Tags.MustBuild(12345)
@@ -224,9 +259,7 @@ func TestTagService_GetTagsByUser(t *testing.T) {
 func TestTagService_InvalidateUserCache(t *testing.T) {
 	repo := NewMockTagRepository()
 	mq := new(MockMQ)
-	service := tags.NewTagService(repo, []EntityType{EntityTypeBlock, EntityTypePost}, mq, mq)
-
-	ctx := context.TODO()
+	ctx, service := newTestTagService(t, repo, mq)
 
 	// 验证缓存不存在
 	cacheKey := service.Schemas.User2Tags.MustBuild(12345)
@@ -259,9 +292,7 @@ func TestTagService_InvalidateTagCache(t *testing.T) {
 	repo := NewMockTagRepository()
 	repo.usersByTag["tag1"] = []utils.UInt64{12345, 67890}
 	mq := new(MockMQ)
-	service := tags.NewTagService(repo, []EntityType{EntityTypeBlock, EntityTypePost}, mq, mq)
-
-	ctx := context.TODO()
+	ctx, service := newTestTagService(t, repo, mq)
 
 	// 验证缓存不存在
 	cacheKey := service.Schemas.Tag2Users.MustBuild("tag1")
@@ -293,13 +324,12 @@ func TestTagService_InvalidateTagCache(t *testing.T) {
 func TestTagService_InvalidateUserTagCache(t *testing.T) {
 	repo := NewMockTagRepository()
 	mq := new(MockMQ)
-	service := tags.NewTagService(repo, []EntityType{EntityTypeBlock, EntityTypePost}, mq, mq)
-
-	ctx := context.TODO()
+	ctx, service := newTestTagService(t, repo, mq)
 
 	// 验证缓存不存在
-	cacheKey := service.Schemas.Entities.MustBuild(tags.ParamUserTagType[EntityType]{UserID: 12345, Tag: "tag1"})
-	entities, err := cache.SET().GetAllUInt64s(ctx, cacheKey)
+	blockCacheKey := service.Schemas.Entities.MustBuild(tags.ParamUserTagType[EntityType]{UserID: 12345, Tag: "tag1", Type: EntityTypeBlock})
+	postCacheKey := service.Schemas.Entities.MustBuild(tags.ParamUserTagType[EntityType]{UserID: 12345, Tag: "tag1", Type: EntityTypePost})
+	entities, err := cache.SET().GetAllUInt64s(ctx, blockCacheKey)
 	assert.NoError(t, err)
 	assert.Empty(t, entities)
 
@@ -309,16 +339,26 @@ func TestTagService_InvalidateUserTagCache(t *testing.T) {
 	assert.Equal(t, []utils.UInt64{100001, 100002}, entities)
 
 	// 验证缓存是否存在
-	entities, err = cache.SET().GetAllUInt64s(ctx, cacheKey)
+	entities, err = cache.SET().GetAllUInt64s(ctx, blockCacheKey)
 	assert.NoError(t, err)
 	assert.Equal(t, []utils.UInt64{100001, 100002}, entities)
+
+	err = cache.SET().InsertUInt64s(ctx, postCacheKey, tags.TagCacheExpiration, 200001)
+	assert.NoError(t, err)
+	entities, err = cache.SET().GetAllUInt64s(ctx, postCacheKey)
+	assert.NoError(t, err)
+	assert.Equal(t, []utils.UInt64{200001}, entities)
 
 	// 调用 InvalidateUserTagCache 方法
 	err = service.InvalidateUserTagCache(ctx, 12345, "tag1", true)
 	assert.NoError(t, err)
 
 	// 验证缓存是否被清除
-	entities, err = cache.SET().GetAllUInt64s(ctx, cacheKey)
+	entities, err = cache.SET().GetAllUInt64s(ctx, blockCacheKey)
+	assert.NoError(t, err)
+	assert.Empty(t, entities)
+
+	entities, err = cache.SET().GetAllUInt64s(ctx, postCacheKey)
 	assert.NoError(t, err)
 	assert.Empty(t, entities)
 }
@@ -328,9 +368,7 @@ func TestTagService_InvalidateEntityCache(t *testing.T) {
 	repo := NewMockTagRepository()
 	repo.tagsByEntity[12345] = []string{"tag1", "tag2"}
 	mq := new(MockMQ)
-	service := tags.NewTagService(repo, []EntityType{EntityTypeBlock, EntityTypePost}, mq, mq)
-
-	ctx := context.TODO()
+	ctx, service := newTestTagService(t, repo, mq)
 
 	// 验证缓存不存在
 	cacheKey := service.Schemas.Entity2Tags.MustBuild(12345)
@@ -363,9 +401,7 @@ func TestTagService_GetUsersByTag(t *testing.T) {
 	repo := NewMockTagRepository()
 	repo.usersByTag["tag1"] = []utils.UInt64{12345, 67890}
 	mq := new(MockMQ)
-	service := tags.NewTagService(repo, []EntityType{EntityTypeBlock, EntityTypePost}, mq, mq)
-
-	ctx := context.TODO()
+	ctx, service := newTestTagService(t, repo, mq)
 
 	// 验证缓存不存在
 	cacheKey := service.Schemas.Tag2Users.MustBuild("tag1")
@@ -389,13 +425,12 @@ func TestTagService_GetEntities(t *testing.T) {
 	repo := NewMockTagRepository()
 	repo.entitiesByTag["tag1"] = map[EntityType][]utils.UInt64{EntityTypeBlock: {100001, 100002}, EntityTypePost: {200001}}
 	mq := new(MockMQ)
-	service := tags.NewTagService(repo, []EntityType{EntityTypeBlock, EntityTypePost}, mq, mq)
-
-	ctx := context.TODO()
+	ctx, service := newTestTagService(t, repo, mq)
 
 	// 验证缓存不存在
-	cacheKey := service.Schemas.Entities.MustBuild(tags.ParamUserTagType[EntityType]{UserID: 12345, Tag: "tag1"})
-	entities, err := cache.SET().GetAllUInt64s(ctx, cacheKey)
+	blockCacheKey := service.Schemas.Entities.MustBuild(tags.ParamUserTagType[EntityType]{UserID: 12345, Tag: "tag1", Type: EntityTypeBlock})
+	postCacheKey := service.Schemas.Entities.MustBuild(tags.ParamUserTagType[EntityType]{UserID: 12345, Tag: "tag1", Type: EntityTypePost})
+	entities, err := cache.SET().GetAllUInt64s(ctx, blockCacheKey)
 	assert.NoError(t, err)
 	assert.Empty(t, entities)
 
@@ -404,10 +439,14 @@ func TestTagService_GetEntities(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, []utils.UInt64{100001, 100002, 200001}, entities)
 
-	// 验证缓存是否存在
-	entities, err = cache.SET().GetAllUInt64s(ctx, cacheKey)
+	// 验证按实体类型缓存是否存在
+	entities, err = cache.SET().GetAllUInt64s(ctx, blockCacheKey)
 	assert.NoError(t, err)
-	assert.Equal(t, []utils.UInt64{100001, 100002, 200001}, entities)
+	assert.Equal(t, []utils.UInt64{100001, 100002}, entities)
+
+	entities, err = cache.SET().GetAllUInt64s(ctx, postCacheKey)
+	assert.NoError(t, err)
+	assert.Equal(t, []utils.UInt64{200001}, entities)
 }
 
 // 测试 TagService 的 GetTagsOfEntity 方法
@@ -415,9 +454,7 @@ func TestTagService_GetTagsOfEntity(t *testing.T) {
 	repo := NewMockTagRepository()
 	repo.tagsByEntity[12345] = []string{"tag1", "tag2"}
 	mq := new(MockMQ)
-	service := tags.NewTagService(repo, []EntityType{EntityTypeBlock, EntityTypePost}, mq, mq)
-
-	ctx := context.TODO()
+	ctx, service := newTestTagService(t, repo, mq)
 
 	// 验证缓存不存在
 	cacheKey := service.Schemas.Entity2Tags.MustBuild(12345)

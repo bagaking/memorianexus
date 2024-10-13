@@ -407,10 +407,12 @@ func (s *TagService[EntityType]) InvalidateUserTagCache(ctx context.Context, use
 	}
 
 	// 2. 清除用户标签自己的缓存
-	cacheKey := s.Schemas.Entities.MustBuild(ParamUserTagType[EntityType]{UserID: userID, Tag: tag})
-	if err := cache.SET().Clear(ctx, cacheKey, MaxRetryAttempts); err != nil {
-		log.Errorf("Failed to clear user tag cache: %v", err)
-		return err
+	for _, entityType := range s.supportedTypes {
+		cacheKey := s.Schemas.Entities.MustBuild(ParamUserTagType[EntityType]{UserID: userID, Tag: tag, Type: entityType})
+		if err := cache.SET().Clear(ctx, cacheKey, MaxRetryAttempts); err != nil {
+			log.Errorf("Failed to clear user tag cache: %v", err)
+			return err
+		}
 	}
 
 	return nil
