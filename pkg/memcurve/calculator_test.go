@@ -211,6 +211,17 @@ func TestCalculateNextReviewWithNegativeReviewLevelAdvancesFromLevelZero(t *test
 	assert.Equal(t, 1, nextReviewLevel, "CalculateNextReview(%+v, %v) review level", data, ConfidenceHigh)
 }
 
+func TestNewReviewCalculatorDefaultsEmptyIntervals(t *testing.T) {
+	calculator := NewReviewCalculator([]time.Duration{}, UserFactors{ForgettingSpeed: 1})
+
+	if got, want := calculator.MaxReviewLevel(), len(DefaultIntervals)-1; got != want {
+		t.Errorf("NewReviewCalculator(empty).MaxReviewLevel() = %d, want %d", got, want)
+	}
+	if got, want := calculator.ReviewIntervalOf(0), DefaultIntervals[0]; got != want {
+		t.Errorf("NewReviewCalculator(empty).ReviewIntervalOf(0) = %v, want %v", got, want)
+	}
+}
+
 func TestCalcIntervalByForgettingSpeed(t *testing.T) {
 	testCases := []struct {
 		name            string

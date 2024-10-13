@@ -53,7 +53,7 @@ type ReviewData struct {
 
 // NewReviewCalculator 创建一个新的ReviewCalculator实例
 func NewReviewCalculator(intervals []time.Duration, factors UserFactors) *ReviewCalculator {
-	if intervals == nil {
+	if len(intervals) == 0 {
 		intervals = DefaultIntervals
 	}
 	return &ReviewCalculator{
