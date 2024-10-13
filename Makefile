@@ -10,7 +10,7 @@ MIGRATION_SERVICE := migration
 MIGRATE_UP_PATH := migration/migrate_up.sql
 MIGRATE_DOWN_PATH := migration/migrate_down.sql
 
-.PHONY: default help gen-docs bundle\
+.PHONY: default help test gen-docs bundle\
  		compose-up compose-down compose-re compose-logs\
  		db-migrate-up db-migrate-down db-migrate-re\
  		dev dev-logs dev-shell\
@@ -23,12 +23,16 @@ default: help
 # Show help
 help:
 	@echo "Available commands:"
+	@echo "  make test : Run Go tests"
 	@echo "  make compose-up : Start all services with docker-compose"
 	@echo "  make compose-down : Stop all services and remove containers"
 	@echo "  make compose-logs : Fetch logs for all services"
 	@echo "  make db-migrate-up : Perform database migrations"
 	@echo "  make db-migrate-down : Rollback database migrations"
 	@echo "  make compose-reset : Stop all services and remove data"
+
+test:
+	go test ./...
 
 gen-docs:
 	# Gen API Documentation

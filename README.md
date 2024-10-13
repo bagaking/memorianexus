@@ -31,6 +31,16 @@ Memoria Nexus is built on a robust technology stack ensuring high performance an
 
 see [Projectt Structure](./doc/CODE_STRUCTURE.md)
 
+## Local Validation
+
+Run the Go test suite before opening a pull request:
+
+```sh
+make test
+```
+
+This target runs `go test ./...` from the repository root.
+
 ## Contributions
 
 We welcome contributions from the community. If you wish to contribute to the project, please check out our [contribution guidelines](./doc/CONTRIBUTING.md).
