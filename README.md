@@ -1,35 +1,44 @@
 # Memoria Nexus
 
-Memoria Nexus is an innovative web application designed to optimize your learning process by leveraging the well-researched Ebbinghaus Forgetting Curve. Our system intelligently schedules reviews for study materials, ensuring you retain information over the long term with minimal effort.
+Memoria Nexus is a Go backend prototype for memory-assisted study workflows.
+The current repository is not a complete web learning product: it contains a
+Go module, API/service scaffolding, database migrations, generated API docs,
+and tested memory-curve calculation code.
 
-## Features
+## Current Status
 
-- **Smart Review Scheduling**: Employing Ebbinghaus' Forgetting Curve, Memoria Nexus determines the optimal review times to reinforce memory retention.
-- **Customizable Study Material**: Create and manage notes, flashcards, and study sets tailored to your learning preferences.
-- **User Progress Analytics**: Get insights into your learning progress with detailed reports and analytics.
-- **Interactive Learning**: Engage with educational content through quizzes and interactive sessions.
-- **Multi-platform Support**: Access your study materials anytime, anywhere with our responsive web design compatible with both desktop and mobile platforms.
-- **Notifications & Reminders**: Never miss a review with timely notifications across multiple devices.
+Implemented and verifiable today:
 
-## Getting Started
+- Go module: `github.com/bagaking/memorianexus`
+- HTTP backend entrypoint using Gin, Gorm, MySQL, Redis, and Swagger wiring
+- Route scaffolding for profiles, items, books, tags, dungeons, campaigns,
+  analytics, NFTs, achievements, operations, and system endpoints
+- Memory-curve review calculation package in `pkg/memcurve` with unit tests
+- Tag package tests in `pkg/tags`
+- Makefile target `make test`, which runs `go test ./...`
+- GitHub Actions workflow `.github/workflows/test.yml`, which runs `make test`
+  on pushes to `main`/`master` and on pull requests
+- Docker-oriented development and deployment assets, including migrations and a
+  Dockerfile
 
-To start using Memoria Nexus, follow these steps:
+Prototype or scaffolded areas:
 
-1. Sign up for an account at [Memoria Nexus](#).
-2. Add your study materials and categorize them based on subjects or topics.
-3. Begin your study sessions using our interactive tools.
-4. Memoria Nexus will automatically schedule reviews based on your performance.
-5. Keep track of your learning journey through our analytics dashboard.
+- Review session, reminder, and core analytics packages under `src/core/` are
+  still TODO scaffolds.
+- The analytic module currently registers handlers, but those handlers do
+  not yet return analytics data.
+- Several gamification and NFT-facing modules expose route shapes before full
+  business behavior is implemented.
+- No React, Redux, Sass, or other frontend application is present in this
+  repository.
+- Local runtime setup still depends on external services and development
+  configuration; the most reliable lightweight validation path is the Go test
+  suite.
 
-## Technology Stack
+## Project Layout
 
-Memoria Nexus is built on a robust technology stack ensuring high performance and reliability:
-
-- Frontend: React, Redux, Sass
-- Backend: Go, PostgreSQL, Redis
-- Infrastructure: Docker, Kubernetes, CI/CD pipelines
-
-see [Projectt Structure](./doc/CODE_STRUCTURE.md)
+See [Project Structure](./doc/CODE_STRUCTURE.md) for the current code layout.
+Generated Swagger output is available under `doc/`.
 
 ## Local Validation
 
@@ -39,21 +48,22 @@ Run the Go test suite before opening a pull request:
 make test
 ```
 
-This target runs `go test ./...` from the repository root.
+This target runs:
 
-## Contributions
+```sh
+go test ./...
+```
 
-We welcome contributions from the community. If you wish to contribute to the project, please check out our [contribution guidelines](./doc/CONTRIBUTING.md).
+## Development Notes
+
+- Use the Makefile for common local tasks.
+- Use the Docker and migration files under `deployment/` and
+  `dev_memorianexus/` when working on service-level runtime setup.
+- Treat user-facing study flows, reminders, review sessions, analytics
+  dashboards, and frontend UI as unfinished until their handlers and tests are
+  implemented.
 
 ## License
 
-Memoria Nexus is licensed under the MIT License. See [LICENSE](LICENSE) for more information.
-
-## Connect with Us
-
-Got questions or feedback? Reach out to us via:
-
-- Email: kinghand@foxmail.com
-- GitHub: [Memoria Nexus Repository](https://github.com/bagaking/memorianexus)
-
-> Learn smarter, not harder with Memoria Nexus - your nexus of memory and learning!
+Memoria Nexus is licensed under the MIT License. See [LICENSE](LICENSE) for
+more information.
