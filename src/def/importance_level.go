@@ -41,6 +41,11 @@ func (i *ImportanceLevel) String() string {
 	return importanceLevelNames[*i]
 }
 
+func (i ImportanceLevel) Valid() bool {
+	_, exists := importanceLevelNames[i]
+	return exists
+}
+
 // UnmarshalJSON unmarshal the enum from a json string or number
 func (i *ImportanceLevel) UnmarshalJSON(data []byte) error {
 	var value interface{}
@@ -50,7 +55,15 @@ func (i *ImportanceLevel) UnmarshalJSON(data []byte) error {
 
 	switch v := value.(type) {
 	case float64:
-		*i = ImportanceLevel(uint8(v))
+		rawLevel, ok := parseUint8JSONNumber(v)
+		if !ok {
+			return errors.New("invalid ImportanceLevel value")
+		}
+		level := ImportanceLevel(rawLevel)
+		if !level.Valid() {
+			return errors.New("invalid ImportanceLevel value")
+		}
+		*i = level
 	case string:
 		for key, name := range importanceLevelNames {
 			if name == v {

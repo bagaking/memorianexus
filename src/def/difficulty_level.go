@@ -85,6 +85,11 @@ func (d *DifficultyLevel) String() string {
 	return difficultyLevelNames[*d]
 }
 
+func (d DifficultyLevel) Valid() bool {
+	_, exists := difficultyLevelNames[d]
+	return exists
+}
+
 // UnmarshalJSON unmarshal the enum from a json string or number
 func (d *DifficultyLevel) UnmarshalJSON(data []byte) error {
 	var value interface{}
@@ -94,7 +99,15 @@ func (d *DifficultyLevel) UnmarshalJSON(data []byte) error {
 
 	switch v := value.(type) {
 	case float64:
-		*d = DifficultyLevel(uint8(v))
+		rawLevel, ok := parseUint8JSONNumber(v)
+		if !ok {
+			return irr.Error("invalid DifficultyLevel value")
+		}
+		level := DifficultyLevel(rawLevel)
+		if !level.Valid() {
+			return irr.Error("invalid DifficultyLevel value")
+		}
+		*d = level
 	case string:
 		for key, name := range difficultyLevelNames {
 			if name == v {
