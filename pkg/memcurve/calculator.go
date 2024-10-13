@@ -156,6 +156,9 @@ func adjustoFrgettingSpeedWithConfidence(
 	confidence float64,
 ) float64 {
 	forgettingSpeed = clamp(forgettingSpeed, 0.2, 5.0)
+	if realInterval <= 0 {
+		return forgettingSpeed
+	}
 
 	// 换算当前遗忘速度下的设定间隔
 	expectedInterval := float64(calcIntervalByForgettingSpeed(setInterval, forgettingSpeed))

@@ -152,6 +152,14 @@ func TestAdjustForgettingSpeedWithConfidence(t *testing.T) {
 			confidence:      ConfidenceLow,
 			expectedSpeed:   2,
 		},
+		{
+			name:            "Low confidence, zero real interval -> keep forgetting speed",
+			forgettingSpeed: 1,
+			setInterval:     1 * time.Hour,
+			realInterval:    0,
+			confidence:      ConfidenceLow,
+			expectedSpeed:   1,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -165,6 +173,25 @@ func TestAdjustForgettingSpeedWithConfidence(t *testing.T) {
 			assert.InDelta(t, tc.expectedSpeed, adjustedSpeed, 0.1, "Adjusted forgetting speed not within expected range")
 		})
 	}
+}
+
+func TestCalculateNextReviewWithSingleLowConfidenceReviewUsesBaseInterval(t *testing.T) {
+	calculator := NewReviewCalculator(nil, UserFactors{ForgettingSpeed: 1})
+	lastReview := time.Now().Add(-time.Hour)
+	data := ReviewData{
+		ReviewRecords: []time.Time{lastReview},
+		ReviewLevel:   3,
+	}
+
+	nextReviewTime, nextReviewLevel := calculator.CalculateNextReview(&data, ConfidenceLow)
+
+	expectedReviewInterval := calculator.ReviewIntervalOf(nextReviewLevel)
+	expectedNextReviewTime := lastReview.Add(expectedReviewInterval)
+	diff := nextReviewTime.Sub(expectedNextReviewTime)
+	if diff < -time.Second || diff > time.Second {
+		t.Errorf("CalculateNextReview(%+v, %v) time = %v, want within 1s of %v", data, ConfidenceLow, nextReviewTime, expectedNextReviewTime)
+	}
+	assert.Equal(t, 1.0, calculator.userFactors.ForgettingSpeed, "CalculateNextReview(%+v, %v) forgetting speed", data, ConfidenceLow)
 }
 
 func TestCalcIntervalByForgettingSpeed(t *testing.T) {
