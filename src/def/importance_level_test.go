@@ -33,6 +33,21 @@ func TestImportanceLevelUnmarshalJSON(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name:    "rounded-up fractional numeric value",
+			input:   `1.0000000000000001`,
+			wantErr: true,
+		},
+		{
+			name:    "rounded fractional numeric value below one",
+			input:   `0.99999999999999999`,
+			wantErr: true,
+		},
+		{
+			name:    "integer exponent numeric value",
+			input:   `1e0`,
+			wantErr: true,
+		},
+		{
 			name:    "fractional numeric value",
 			input:   `1.5`,
 			wantErr: true,

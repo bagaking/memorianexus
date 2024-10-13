@@ -1,10 +1,9 @@
 package def
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
-
-	jsoniter "github.com/json-iterator/go"
 )
 
 type DungeonType uint8 // 0 ~ 255
@@ -41,14 +40,22 @@ func (dt *DungeonType) Valid() bool {
 
 // UnmarshalJSON custom unmarshaller to handle both strings and numbers
 func (dt *DungeonType) UnmarshalJSON(data []byte) error {
-	var value any
-	if err := jsoniter.Unmarshal(data, &value); err != nil {
+	value, err := decodeJSONValue(data)
+	if err != nil {
 		return err
 	}
 
 	switch v := value.(type) {
-	case float64:
-		*dt = DungeonType(v)
+	case json.Number:
+		rawType, ok := parseUint8JSONNumber(v)
+		if !ok {
+			return fmt.Errorf("invalid dungeon type: %s", v.String())
+		}
+		dungeonType := DungeonType(rawType)
+		if !dungeonType.Valid() {
+			return fmt.Errorf("invalid dungeon type: %s", v.String())
+		}
+		*dt = dungeonType
 	case string:
 		switch strings.TrimSpace(strings.ToLower(v)) {
 		case "campaign", "1":

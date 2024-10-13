@@ -48,13 +48,13 @@ func (i ImportanceLevel) Valid() bool {
 
 // UnmarshalJSON unmarshal the enum from a json string or number
 func (i *ImportanceLevel) UnmarshalJSON(data []byte) error {
-	var value interface{}
-	if err := json.Unmarshal(data, &value); err != nil {
+	value, err := decodeJSONValue(data)
+	if err != nil {
 		return err
 	}
 
 	switch v := value.(type) {
-	case float64:
+	case json.Number:
 		rawLevel, ok := parseUint8JSONNumber(v)
 		if !ok {
 			return errors.New("invalid ImportanceLevel value")

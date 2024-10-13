@@ -1,7 +1,8 @@
 package def
 
 import (
-	jsoniter "github.com/json-iterator/go"
+	"encoding/json"
+
 	"github.com/khicago/irr"
 )
 
@@ -92,13 +93,13 @@ func (d DifficultyLevel) Valid() bool {
 
 // UnmarshalJSON unmarshal the enum from a json string or number
 func (d *DifficultyLevel) UnmarshalJSON(data []byte) error {
-	var value interface{}
-	if err := jsoniter.Unmarshal(data, &value); err != nil {
+	value, err := decodeJSONValue(data)
+	if err != nil {
 		return err
 	}
 
 	switch v := value.(type) {
-	case float64:
+	case json.Number:
 		rawLevel, ok := parseUint8JSONNumber(v)
 		if !ok {
 			return irr.Error("invalid DifficultyLevel value")
