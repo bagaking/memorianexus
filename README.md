@@ -24,7 +24,8 @@ Implemented and verifiable today:
 Prototype or scaffolded areas:
 
 - Review session, reminder, and core analytics packages under `src/core/` are
-  still TODO scaffolds.
+  planned extensions with placeholder implementations, not production-complete
+  features.
 - The analytic module currently registers handlers, but those handlers do
   not yet return analytics data.
 - Several gamification and NFT-facing modules expose route shapes before full
