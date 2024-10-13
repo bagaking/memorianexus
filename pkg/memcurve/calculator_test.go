@@ -160,6 +160,38 @@ func TestAdjustForgettingSpeedWithConfidence(t *testing.T) {
 			confidence:      ConfidenceLow,
 			expectedSpeed:   1,
 		},
+		{
+			name:            "High confidence, much longer real interval -> clamp to minimum speed",
+			forgettingSpeed: 1,
+			setInterval:     1 * time.Hour,
+			realInterval:    100 * time.Hour,
+			confidence:      ConfidenceHigh,
+			expectedSpeed:   0.2,
+		},
+		{
+			name:            "Low confidence, much shorter real interval -> clamp to maximum speed",
+			forgettingSpeed: 1,
+			setInterval:     1 * time.Hour,
+			realInterval:    time.Minute,
+			confidence:      ConfidenceLow,
+			expectedSpeed:   5,
+		},
+		{
+			name:            "Non-positive real interval clamps high initial speed",
+			forgettingSpeed: 100,
+			setInterval:     1 * time.Hour,
+			realInterval:    0,
+			confidence:      ConfidenceLow,
+			expectedSpeed:   5,
+		},
+		{
+			name:            "Non-positive real interval clamps low initial speed",
+			forgettingSpeed: 0.01,
+			setInterval:     1 * time.Hour,
+			realInterval:    -time.Second,
+			confidence:      ConfidenceHigh,
+			expectedSpeed:   0.2,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -288,6 +320,12 @@ func TestCalcIntervalByForgettingSpeed(t *testing.T) {
 			duration:        1 * time.Hour,
 			speed:           0.5,
 			expectedOutcome: 2 * time.Hour,
+		},
+		{
+			name:            "Zero forgetting speed defaults to normal speed",
+			duration:        1 * time.Hour,
+			speed:           0,
+			expectedOutcome: 1 * time.Hour,
 		},
 	}
 
