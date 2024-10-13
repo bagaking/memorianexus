@@ -100,17 +100,17 @@ func (calc *ReviewCalculator) CalculateReviewLevel(data *ReviewData, newConfiden
 	if newConfidence <= ConfidenceNone { // 低置信度重置复习级别到 0
 		return 0
 	} else if newConfidence <= ConfidenceLow { // 低置信度降低复习级别
-		return max(1, currentLevel/2)
+		return calc.clampReviewLevel(max(1, currentLevel/2))
 	} else if newConfidence <= ConfidenceMedium {
 		// 中置信度少量推进复习级别，但不会推进到最后2级
 		// todo: provide config
-		return min(len(calc.reviewIntervals)-3, currentLevel+1)
+		return calc.clampReviewLevel(min(len(calc.reviewIntervals)-3, currentLevel+1))
 	} else if newConfidence <= ConfidenceHigh {
 		// 高置信度，按部就班的增加复习级别，但不应超过当前记录的复习次数
-		return min(len(calc.reviewIntervals)-1, currentLevel+1)
+		return calc.clampReviewLevel(min(len(calc.reviewIntervals)-1, currentLevel+1))
 	} else {
 		// 牢记级别，直接 x 2，但不应超过当前记录的复习次数
-		return min(len(calc.reviewIntervals)-1, max(currentLevel, 1)*2)
+		return calc.clampReviewLevel(min(len(calc.reviewIntervals)-1, max(currentLevel, 1)*2))
 	}
 }
 

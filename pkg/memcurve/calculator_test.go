@@ -222,6 +222,54 @@ func TestNewReviewCalculatorDefaultsEmptyIntervals(t *testing.T) {
 	}
 }
 
+func TestCalculateReviewLevelClampsToCustomIntervalRange(t *testing.T) {
+	testCases := []struct {
+		name       string
+		intervals  []time.Duration
+		level      int
+		confidence float64
+		want       int
+	}{
+		{
+			name:       "one interval with low confidence",
+			intervals:  []time.Duration{time.Hour},
+			level:      0,
+			confidence: ConfidenceLow,
+			want:       0,
+		},
+		{
+			name:       "two intervals with medium confidence",
+			intervals:  []time.Duration{time.Hour, 2 * time.Hour},
+			level:      1,
+			confidence: ConfidenceMedium,
+			want:       0,
+		},
+		{
+			name:       "two intervals with certain confidence",
+			intervals:  []time.Duration{time.Hour, 2 * time.Hour},
+			level:      1,
+			confidence: ConfidenceCertain,
+			want:       1,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			calculator := NewReviewCalculator(tc.intervals, UserFactors{ForgettingSpeed: 1})
+			data := ReviewData{ReviewLevel: tc.level}
+
+			got := calculator.CalculateReviewLevel(&data, tc.confidence)
+			if got != tc.want {
+				t.Errorf("CalculateReviewLevel(%+v, %v) = %d, want %d", data, tc.confidence, got, tc.want)
+			}
+
+			if got < 0 || got > calculator.MaxReviewLevel() {
+				t.Errorf("CalculateReviewLevel(%+v, %v) = %d, want within [0,%d]", data, tc.confidence, got, calculator.MaxReviewLevel())
+			}
+		})
+	}
+}
+
 func TestCalcIntervalByForgettingSpeed(t *testing.T) {
 	testCases := []struct {
 		name            string
