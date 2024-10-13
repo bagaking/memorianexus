@@ -202,7 +202,7 @@ func TestAdjustForgettingSpeedWithConfidence(t *testing.T) {
 				},
 			}
 			adjustedSpeed := adjustoFrgettingSpeedWithConfidence(calculator.userFactors.ForgettingSpeed, tc.setInterval, tc.realInterval, tc.confidence)
-			assert.InDelta(t, tc.expectedSpeed, adjustedSpeed, 0.1, "Adjusted forgetting speed not within expected range")
+			assert.InDelta(t, tc.expectedSpeed, adjustedSpeed, 1e-9, "Adjusted forgetting speed not within expected range")
 		})
 	}
 }
